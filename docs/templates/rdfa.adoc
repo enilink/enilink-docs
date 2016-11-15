@@ -1,0 +1,136 @@
+= Lift RDFa Templates
+
+toc::[]
+
+== RDFa
+
+A very important and powerful part of the eniLINK
+link:index.html[Lift template system] is its support for using
+https://www.w3.org/TR/rdfa-primer/[RDFa] annotations to query the underlying
+triplestore and create dynamic page content from the query results.
+
+The RDFa support is implemented with a Snippet, Rdfa, and follow the
+principles outlined in the link:index.html[Lift template basics].
+
+== Motivation
+
+When talking about creating dynamic web pages from templates, it
+is of interest how to request content from the data storage backend that
+matches certain patterns, then filter, sort and format it in different ways
+for the output.
+
+The eniLINK platform with its base framework KOMMA are built on top of the
+Linked Data principles, using triples in graph databases or triplestores as
+the underlying information repository. As usual with triplestores, queries
+are expressed in SPARQL as a set of triple patterns.
+
+In effect, what a dynamic page request would need to to do is to bind
+certain variables from such a SPARQL query to template elements or
+attributes to create the final page. One would already know which variable
+should be _bound to_ which element or attribute and could, in other words,
+add additional markup to these template elements to describe such bindings.
+
+Say we meant to display a list of certain types of resources in our
+triplestore, using some attribute as their description in the list. We would
+query for the relevant types of resources with their values for the given
+attribute, and bind those values to new elements on our final page.
+
+We would need to write a SPARQL query with variables, and code that iterated
+over the query result to generate our elements and bind the variable values
+to the attributes for these elements.
+
+Or... would we?
+
+Consider that we also knew where the variable was used in the SPARQL query,
+or what it was _bound from_ in terms of our triplestore, so why not also add
+a description of that to the markup?
+
+Considering our premise from above, we could have markup for
+
+. a list of resources of a certain type, say _&lt;foaf:Person&gt;_
+. one single resource of that type, bound to a variable, say _?person_
+. a variable for the attribute _&lt;foaf:name&gt;_ of _?person_, say _?name_
+. and the value of _?name_ as some content on the page.
+
+Now... the good news is that there already is markup available that helps us
+express triple patterns in terms of RDF types and properties from our
+triplestore, as needed to construct the SPARQL query. It's called RDFa
+(Resource Description Framework in Attributes).
+
+[quote, , https://www.w3.org/TR/rdfa-primer/#abstract]
+____
+A key enabling technology behind these developments is the ability to add
+structured data to HTML pages directly. RDFa (Resource Description Framework
+in Attributes) is a technique that allows just that: it provides a set of
+markup attributes to augment the visual information on the Web with
+machine-readable hints.
+____
+
+While the original intention of RDFa is the reverse of what we want to use it
+for, the general idea of augmenting content with meta-information in RDF terms
+applies, and has benefits, for our use-case as well.
+
+== Example
+
+Let us get back to our premise and, since we already linked to the apply it to
+https://www.w3.org/TR/rdfa-primer/#exploring-further-social-networks[Example 15]
+from there.
+
+As stated, the example is just using the RDFa annotations to further describe
+content on some static html page, but we want to use them to actually create
+such a page, dynamically, from a query against some triplestore with maybe
+more than one _&lt;foaf:Person&gt;_.
+
+.query1.html
+[source,html]
+----
+<div data-lift="rdfa" prefix="foaf: http://xmlns.com/foaf/0.1/">
+	<div vocab="http://xmlns.com/foaf/0.1/" typeof="foaf:Person">
+		<p>
+			<span property="foaf:name" data-lift="rdf.label"></span>,
+			Email: <a property="foaf:mbox" data-lift="rdf.ref"></a>,
+			Phone: <a property="foaf:phone" data-lift="rdf.ref"></a>
+		</p>
+	</div>
+</div>
+----
+
+This is the HTML from Example 15, wrapped in an extra &lt;div&gt; that
+invokes the Rdfa snippet, and with the static content replaced by an
+additional snippet invocation that will actually bind the variable values to
+the individual fields for the final page.
+Another small difference is the definition and use of the _foaf:_ prefix for
+the annotations. (FIXME: vocab not supported right now!)
+
+The Rdfa snippet, when executed with those XML nodes, will create the
+following SPARQL query, as a set of triple patterns using the type and property
+information from the annotations:
+
+.generated SPARQL
+[source,sparql]
+----
+prefix foaf: <http://xmlns.com/foaf/0.1/>
+SELECT DISTINCT ?l_ ?l__3 ?l__4 WHERE {
+	?x4 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> . 
+	?x4 <http://xmlns.com/foaf/0.1/name> ?l_ . 
+	?x4 <http://xmlns.com/foaf/0.1/mbox> ?l__3 . 
+	?x4 <http://xmlns.com/foaf/0.1/phone> ?l__4 . 
+}
+----
+
+NOTE: We haven't actually used named variables here, but merely used the annotations from the primer.
+
+Supposing we had the triples from Example 15 in our triplestore, this would
+then result in:
+
+[source,html]
+----
+<div data-t="1" prefix="foaf: http://xmlns.com/foaf/0.1/" xmlns:foaf="http://xmlns.com/foaf/0.1/">
+	<div typeof="http://xmlns.com/foaf/0.1/Person" data-t="2" vocab="http://xmlns.com/foaf/0.1/">
+		<p data-t="3">
+			<span data-t="4" property="foaf:name">Alice Birpemswick</span>,
+			Email: <a data-t="5" property="foaf:mbox">mailto:alice@example.com</a>,
+			Phone: <a data-t="6" property="foaf:phone">tel:+1-617-555-7332</a>
+		</p>
+	</div>
+</div>

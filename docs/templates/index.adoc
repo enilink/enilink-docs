@@ -1,0 +1,139 @@
+= Lift Template Basics
+
+toc::[]
+
+== Introduction
+
+The eniLINK platform makes use of the
+  http://liftweb.net/[Lift web framework] for its web templates. +
+Lift itself is written in http://scala-lang.org/[Scala], an object-oriented
+and functional programming language that runs in the JVM.
+
+David Pollak, Lift's creator, describes its properties in
+  http://simply.liftweb.net/[Simply Lift]:
+[quote, http://simply.liftweb.net/index-3.4.html]
+----
+Lift templates contain no executable code. They are pure, raw, valid HTML.
+Lift uses snippets to transform sections of the HTML page from static to dynamic. The key word is transform.
+----
+
+In contrast to many other templating systems, the transformation doesn't
+concatenate string contents, but works on sequences of XML nodes that it
+transforms from input to output using _Snippets_.
+Snippets are Scala code that is referenced from, but not included in, the
+templates (hence: no executable code).
+
+Think of a Lift page template using Snippets as a collection of components that
+generate parts of the final page.
+
+== Basic Usage
+
+As mentioned, Lift templates simply consist of (X)HTML tags.
+
+This does not mean that a lift template will be a complete document with
+`<html></html>` blocks or other _Chrome_, like David Pollak calls it.
+Instead, there typically is a default template with all of the common markup
+while the page template will just contain markup for its actual content.
+
+.Example
+[source,html]
+----
+<div data-lift="surround?with=default;at=content" />
+----
+
+This would create a page with decorations and other elements as specified in
+the default template (think CSS and scripts, like Bootstrap, jQuery etc.) but
+otherwise empty.
+
+NOTE: Lift makes heavy use of `data-*` attributes to convey parameters to the
+snippets. The attribute `data-lift`, specifically, tells Lift which snippet
+is to be http://simply.liftweb.net/index-23.1.html#sec:Snippet-Resolution[invoked].
+
+== Tags and Snippets
+
+In a nutshell, Lift templates combine basic tags with certain attributes
+that instruct Lift to invoke appropriate Snippets, which transform the
+tag body or content into the final output. The snippets are free to replace the
+entire tag with other markup, but they can also just add, replace, or repeat
+pieces.
+
+Lets start with a very simple example.
+
+.example.html
+[source,html]
+----
+<html>
+  <body>
+    <div id="example-1" class="example" data-lift="ExampleSnippet"></div>
+  </body>
+</html>
+----
+
+This will invoke the method `render(in: NodeSeq): NodeSeq` of the class
+ExampleSnippet with the full <div/> tag as input XML node sequence `in`,
+and generate the output from whatever the method returns as its result.
+
+If we go for the most straight-forward implementation possible, and just
+return whatever input we receive, ...
+
+.ExampleSnippet.scala
+[source,scala]
+----
+import scala.xml.NodeSeq
+
+class ExampleSnippet {
+  def render(in: NodeSeq): NodeSeq = {
+    in
+  }
+}
+----
+
++++...+++ the result will basically be the same page (with maybe a bit of
+re-formatting and some Lift AJAX helpers) with the div still being there,
+having all the same attributes and values (with the exception of `data-lift`
+itself).
+
+== Transformation
+
+Of course, what we actually want to do is to place dynamic content onto
+the page by transforming parts of the templates.
+
+Consider this example, slightly modified from http://simply.liftweb.net/index-7.1.html#toc-Subsection-7.1.1[Simply Lift]:
+
+.time.html
+[source,html]
+----
+<span class="time" data-lift="CurrentTime">The time is <span id="current-time">current time</span>.</span>
+----
+
+Along with the following snippet class (see http://simply.liftweb.net/index-7.10.html#sec:CSS-Selector-Transforms[CSS transforms]), ...
+
+.CurrentTime.scala
+[source,scala]
+----
+import java.util.Date
+import net.liftweb.util.Helpers._
+
+class CurrentTime {
+  def render = "#current-time" #> (new Date).toString
+}
+----
+
++++...+++ this will replace the inner span element, completely, with a string
+representation of the time the page was requested at:
+
+[source,html]
+----
+<span class="time">The time is Wed Nov 02 17:39:19 CET 2016.</span>
+----
+
+== RDFa
+
+A very important and powerful part of the eniLINK Lift template system is
+its support for using https://www.w3.org/TR/rdfa-primer/[RDFa] annotations
+to query the underlying triplestore and put the query results into the
+resulting pages.
+
+The RDFa support is implemented with a Snippet, Rdfa, and as such works on
+the principles outlined above. It offers a lot of possibilities, and has
+its own documentation, which you can continue reading link:rdfa.html[here].
